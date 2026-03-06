@@ -26,6 +26,9 @@ export default function MessagingPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [currentUserId, setCurrentUserId] = useState('');
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+
+  useProvideObject('selectedUser', () => selectedUser, { dependencies: [selectedUser] });
 
   useEffect(() => {
     loadUsers();
@@ -93,7 +96,7 @@ export default function MessagingPage() {
   };
 
   const openChat = (user: UserProfile) => {
-    nav.provideObject('selectedUser', () => user);
+    setSelectedUser(user);
     nav.push('chat_page');
   };
 

@@ -164,7 +164,7 @@ export default function Main() {
           floatingButtonPosition="left"
           floatingButtonBottom="16px"
           floatingButtonPadding="16px"
-          floatingButtonColor={theme === 'light' ? "#dc2626" : "#ffffff"}
+          floatingButtonColor={theme === 'light' ? "#dc2626" : "#dc2626"}
           floatingButtonTextColor="#fff"
           floatingButtonRadius="50%"
           floatingButtonShadow={theme === 'light' ? "0 6px 12px rgba(0,0,0,0.25)" : "0 6px 12px rgba(0,0,0,0.4)"}
