@@ -90,7 +90,18 @@ export default function ChatPage() {
     loadMessages();
   };
 
-  if (loading || !selectedUser) return <LoadingSpinner />;
+  if (!selectedUser) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '1rem' }}>
+        <LoadingSpinner />
+        <button onClick={() => nav.pop()} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: 'none', background: '#dc2626', color: 'white', cursor: 'pointer' }}>
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <main className={`${styles.container} ${styles[`container_${theme}`]}`}>
