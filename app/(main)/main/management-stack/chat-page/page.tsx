@@ -24,11 +24,17 @@ export default function ChatPage() {
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [messageText, setMessageText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const prevMessagesLengthRef = useRef(0);
 
   useEffect(() => {
     if (selectedUserResult.isProvided) {
       const user = selectedUserResult.getter();
-      setSelectedUser(user);
+      if (user) {
+        setSelectedUser(user);
+      } else if(nav.isTop()){
+        nav.pop();
+      }
     }
   }, [selectedUserResult.isProvided, selectedUserResult.getter]);
 
@@ -41,7 +47,10 @@ export default function ChatPage() {
   }, [selectedUser]);
 
   useEffect(() => {
-    scrollToBottom();
+    if (messages.length > prevMessagesLengthRef.current) {
+      scrollToBottom();
+    }
+    prevMessagesLengthRef.current = messages.length;
   }, [messages]);
 
   const scrollToBottom = () => {
@@ -51,7 +60,7 @@ export default function ChatPage() {
   const loadMessages = async () => {
     try {
       if (!selectedUser) return;
-      
+
       const { data: { user } } = await supabaseBrowser.auth.getUser();
       if (!user) return;
 
@@ -81,14 +90,19 @@ export default function ChatPage() {
     e.preventDefault();
     if (!messageText.trim() || !selectedUser) return;
 
-    await supabaseBrowser.from('messages').insert({
+    const { error } = await supabaseBrowser.from('messages').insert({
       sender_id: currentUserId,
       recipient_id: selectedUser.id,
       body: messageText,
     });
 
+    if (error) {
+      console.error('Error sending message:', error);
+      return;
+    }
+
     setMessageText('');
-    loadMessages();
+    await loadMessages();
   };
 
   if (!selectedUser) {
@@ -142,16 +156,18 @@ export default function ChatPage() {
 
       <form onSubmit={sendMessage} className={`${styles.messageForm} ${styles[`messageForm_${theme}`]}`}>
         <input
+          ref={inputRef}
           type="text"
           value={messageText}
           onChange={(e) => setMessageText(e.target.value)}
+          onFocus={scrollToBottom}
           placeholder="Type a message..."
           className={styles.messageInput}
         />
         <button type="submit" className={styles.sendButton}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
           </svg>
         </button>
       </form>
