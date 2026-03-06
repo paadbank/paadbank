@@ -17,7 +17,7 @@ type UserProfile = {
 export default function ChatPage() {
   const nav = useNav();
   const { theme } = useTheme();
-  const selectedUserResult = useObject<UserProfile>('selectedUser');
+  const selectedUserResult = useObject<UserProfile>('selectedUser', { stack: true });
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,9 +27,10 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (selectedUserResult.isProvided) {
-      setSelectedUser(selectedUserResult.getter());
+      const user = selectedUserResult.getter();
+      setSelectedUser(user);
     }
-  }, [selectedUserResult.isProvided]);
+  }, [selectedUserResult.isProvided, selectedUserResult.getter]);
 
   useEffect(() => {
     if (selectedUser) {

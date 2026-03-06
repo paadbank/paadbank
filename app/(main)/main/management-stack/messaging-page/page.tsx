@@ -28,7 +28,7 @@ export default function MessagingPage() {
   const [currentUserId, setCurrentUserId] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
-  useProvideObject('selectedUser', () => selectedUser, { dependencies: [selectedUser] });
+  useProvideObject('selectedUser', () => selectedUser, { stack: true, dependencies: [selectedUser] });
 
   useEffect(() => {
     loadUsers();
@@ -97,7 +97,7 @@ export default function MessagingPage() {
 
   const openChat = (user: UserProfile) => {
     setSelectedUser(user);
-    nav.push('chat_page');
+    setTimeout(() => nav.push('chat_page'), 0);
   };
 
   if (loading) return <LoadingSpinner />;
