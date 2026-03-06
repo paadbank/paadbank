@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/context/ThemeContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -21,6 +21,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,13 +118,26 @@ export default function SignupPage() {
 
           <div className={styles.field}>
             <label className={styles.label}>{t('date_of_birth') || 'Date of Birth'}</label>
-            <input
-              type="date"
-              value={dateOfBirth}
-              onChange={(e) => setDateOfBirth(e.target.value)}
-              className={styles.input}
-              disabled={loading}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                value={dateOfBirth ? new Date(dateOfBirth).toLocaleDateString() : ''}
+                onClick={() => dateInputRef.current?.click()}
+                readOnly
+                placeholder="Select date"
+                className={styles.input}
+                disabled={loading}
+                style={{ cursor: 'pointer' }}
+              />
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                style={{ position: 'absolute', opacity: 0, pointerEvents: 'all', top: 0, left: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+                max={new Date().toISOString().split('T')[0]}
+              />
+            </div>
           </div>
 
           <div className={styles.field}>
