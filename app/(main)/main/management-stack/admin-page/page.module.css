@@ -428,6 +428,22 @@
   background: #1d4ed8;
 }
 
+.viewBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s;
+  color: #10b981;
+}
+
+.viewBtn:hover {
+  background: rgba(16, 185, 129, 0.1);
+}
+
 @media screen and (min-width: 500px) and (max-width: 800px) {
   .header {
     left: 0;

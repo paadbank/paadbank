@@ -48,6 +48,7 @@ CREATE TABLE profiles (
   next_period_date DATE,
   pad_allocation_limit INTEGER DEFAULT 0,
   assigned_distributor_id UUID REFERENCES profiles(id),
+  beneficiary_code VARCHAR(20) UNIQUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -61,6 +62,8 @@ CREATE TABLE cycle_logs (
   duration_days INTEGER GENERATED ALWAYS AS (CASE WHEN end_date IS NOT NULL THEN (end_date - start_date) ELSE NULL END) STORED,
   flow_intensity flow_intensity,
   notes TEXT,
+  feelings TEXT,
+  mood VARCHAR(100),
   status cycle_status DEFAULT 'open' NOT NULL,
   logged_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -76,7 +79,6 @@ CREATE TABLE distributions (
   pads_per_day DECIMAL(4,2),
   transport_mode transport_mode NOT NULL,
   delivery_address TEXT,
-  pad_cost DECIMAL(10,2) DEFAULT 0,
   delivery_cost DECIMAL(10,2) DEFAULT 0,
   status distribution_status DEFAULT 'pending' NOT NULL,
   pickup_reference_code VARCHAR(50),
@@ -98,6 +100,7 @@ CREATE TABLE expense_records (
   recorded_by UUID NOT NULL REFERENCES profiles(id),
   document_url TEXT,
   notes TEXT,
+  source VARCHAR(50) DEFAULT 'manual',
   is_confirmed BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -154,6 +157,17 @@ CREATE TABLE role_change_log (
   changed_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- PROFILE CODES TABLE
+CREATE TABLE profile_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code VARCHAR(20) NOT NULL UNIQUE,
+  created_by UUID NOT NULL REFERENCES profiles(id),
+  used_by UUID REFERENCES profiles(id),
+  is_used BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  used_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- AUDIT LOG TABLE
 CREATE TABLE audit_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -186,6 +200,8 @@ CREATE INDEX idx_messages_recipient ON messages(recipient_id);
 CREATE INDEX idx_messages_group ON messages(group_id);
 CREATE INDEX idx_audit_log_actor ON audit_log(actor_id);
 CREATE INDEX idx_audit_log_target ON audit_log(target_table, target_id);
+CREATE INDEX idx_profiles_beneficiary_code ON profiles(beneficiary_code);
+CREATE INDEX idx_profile_codes_code ON profile_codes(code);
 
 -- TRIGGER: Auto-create profile on user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -251,19 +267,17 @@ RETURNS user_role AS $$
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
 
 -- PROFILES POLICIES
-CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Admins can view all profiles" ON profiles FOR SELECT USING (
-  public.get_user_role() IN ('admin', 'manager', 'sales')
-);
+CREATE POLICY "All users can view profiles" ON profiles FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "Allow beneficiary code lookup for login" ON profiles FOR SELECT USING (beneficiary_code IS NOT NULL);
 CREATE POLICY "Admins can update profiles" ON profiles FOR UPDATE USING (
   public.get_user_role() IN ('admin', 'manager')
 );
 CREATE POLICY "Admin can delete profiles" ON profiles FOR DELETE USING (
   public.get_user_role() = 'admin'
 );
-CREATE POLICY "Distributors can view assigned beneficiaries" ON profiles FOR SELECT USING (
-  assigned_distributor_id = auth.uid()
+CREATE POLICY "Logger can view all beneficiaries" ON profiles FOR SELECT USING (
+  public.get_user_role() = 'logger' AND role = 'beneficiary'
 );
 
 -- CYCLE LOGS POLICIES
@@ -273,6 +287,9 @@ CREATE POLICY "Admins can view all cycle logs" ON cycle_logs FOR SELECT USING (
 );
 CREATE POLICY "Distributors can view assigned beneficiary logs" ON cycle_logs FOR SELECT USING (
   EXISTS (SELECT 1 FROM profiles p WHERE p.id = cycle_logs.beneficiary_id AND p.assigned_distributor_id = auth.uid())
+);
+CREATE POLICY "Logger can manage all cycle logs" ON cycle_logs FOR ALL USING (
+  public.get_user_role() = 'logger'
 );
 
 -- DISTRIBUTIONS POLICIES
@@ -303,24 +320,28 @@ CREATE POLICY "Admins can create notifications" ON notifications FOR INSERT WITH
 );
 
 -- MESSAGES POLICIES
-CREATE POLICY "Users can view own messages" ON messages FOR SELECT USING (
+CREATE POLICY "Users can view their messages" ON messages FOR SELECT USING (
   sender_id = auth.uid() OR recipient_id = auth.uid() OR
   EXISTS (SELECT 1 FROM message_group_members WHERE group_id = messages.group_id AND user_id = auth.uid())
 );
-CREATE POLICY "Users can send messages" ON messages FOR INSERT WITH CHECK (sender_id = auth.uid());
-CREATE POLICY "Users can update own messages" ON messages FOR UPDATE USING (sender_id = auth.uid());
+CREATE POLICY "Users can send messages" ON messages FOR INSERT WITH CHECK (
+  sender_id = auth.uid() AND (recipient_id IS NOT NULL OR EXISTS (SELECT 1 FROM message_group_members WHERE group_id = messages.group_id AND user_id = auth.uid()))
+);
+CREATE POLICY "Users can update messages" ON messages FOR UPDATE USING (
+  sender_id = auth.uid() OR recipient_id = auth.uid() OR EXISTS (SELECT 1 FROM message_group_members WHERE group_id = messages.group_id AND user_id = auth.uid())
+);
 
 -- MESSAGE GROUPS POLICIES
-CREATE POLICY "Admins can manage groups" ON message_groups FOR ALL USING (
-  public.get_user_role() IN ('admin', 'manager')
-);
-CREATE POLICY "Members can view groups" ON message_groups FOR SELECT USING (
-  EXISTS (SELECT 1 FROM message_group_members WHERE group_id = message_groups.id AND user_id = auth.uid())
+CREATE POLICY "Users can create groups" ON message_groups FOR INSERT WITH CHECK (created_by = auth.uid());
+CREATE POLICY "Users can manage own groups" ON message_groups FOR UPDATE USING (created_by = auth.uid());
+CREATE POLICY "Users can delete own groups" ON message_groups FOR DELETE USING (created_by = auth.uid());
+CREATE POLICY "Users can view their groups" ON message_groups FOR SELECT USING (
+  created_by = auth.uid() OR EXISTS (SELECT 1 FROM message_group_members WHERE group_id = message_groups.id AND user_id = auth.uid())
 );
 
 -- MESSAGE GROUP MEMBERS POLICIES
-CREATE POLICY "Admins can manage group members" ON message_group_members FOR ALL USING (
-  public.get_user_role() IN ('admin', 'manager')
+CREATE POLICY "Group creators can manage members" ON message_group_members FOR ALL USING (
+  EXISTS (SELECT 1 FROM message_groups WHERE id = message_group_members.group_id AND created_by = auth.uid())
 );
 CREATE POLICY "Members can view group members" ON message_group_members FOR SELECT USING (
   EXISTS (SELECT 1 FROM message_group_members mgm WHERE mgm.group_id = message_group_members.group_id AND mgm.user_id = auth.uid())
@@ -336,3 +357,8 @@ CREATE POLICY "Admins can view audit log" ON audit_log FOR SELECT USING (
   public.get_user_role() IN ('admin', 'manager')
 );
 CREATE POLICY "System can insert audit log" ON audit_log FOR INSERT WITH CHECK (true);
+
+-- PROFILE CODES POLICIES
+CREATE POLICY "Admins can manage profile codes" ON profile_codes FOR ALL USING (
+  public.get_user_role() IN ('admin', 'manager')
+);

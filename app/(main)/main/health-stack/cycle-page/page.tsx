@@ -25,6 +25,8 @@ export default function CyclePage() {
     start_date: '',
     end_date: '',
     flow_intensity: 'moderate',
+    feelings: '',
+    mood: '',
     notes: '',
   });
 
@@ -82,7 +84,7 @@ export default function CyclePage() {
     }
 
     setShowForm(false);
-    setFormData({ start_date: '', end_date: '', flow_intensity: 'moderate', notes: '' });
+    setFormData({ start_date: '', end_date: '', flow_intensity: 'moderate', feelings: '', mood: '', notes: '' });
     
     // Fetch fresh data and update state
     const { data } = await supabaseBrowser
@@ -100,6 +102,8 @@ export default function CyclePage() {
       start_date: cycle.startDate,
       end_date: cycle.endDate || '',
       flow_intensity: cycle.flowIntensity || 'moderate',
+      feelings: (cycle as any).feelings || '',
+      mood: (cycle as any).mood || '',
       notes: cycle.notes || '',
     });
     setShowForm(true);
@@ -152,6 +156,30 @@ export default function CyclePage() {
               </select>
             </div>
             <div className={styles.field}>
+              <label>Mood</label>
+              <select
+                value={formData.mood}
+                onChange={(e) => setFormData({ ...formData, mood: e.target.value })}
+              >
+                <option value="">Select mood</option>
+                <option value="happy">Happy</option>
+                <option value="normal">Normal</option>
+                <option value="sad">Sad</option>
+                <option value="anxious">Anxious</option>
+                <option value="irritable">Irritable</option>
+                <option value="tired">Tired</option>
+              </select>
+            </div>
+            <div className={styles.field}>
+              <label>Feelings</label>
+              <textarea
+                value={formData.feelings}
+                onChange={(e) => setFormData({ ...formData, feelings: e.target.value })}
+                placeholder="How are you feeling?"
+                rows={2}
+              />
+            </div>
+            <div className={styles.field}>
               <label>Notes</label>
               <textarea
                 value={formData.notes}
@@ -191,6 +219,8 @@ export default function CyclePage() {
               <div className={styles.details}>
                 <p><strong>End:</strong> {cycle.endDate ? new Date(cycle.endDate).toLocaleDateString() : 'Ongoing'}</p>
                 <p><strong>Flow:</strong> {cycle.flowIntensity}</p>
+                {(cycle as any).mood && <p><strong>Mood:</strong> {(cycle as any).mood}</p>}
+                {(cycle as any).feelings && <p><strong>Feelings:</strong> {(cycle as any).feelings}</p>}
                 {cycle.notes && <p><strong>Notes:</strong> {cycle.notes}</p>}
               </div>
             </div>

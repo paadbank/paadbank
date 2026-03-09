@@ -5,13 +5,15 @@ import { useRouter } from 'next/navigation';
 import { useTheme } from '@/context/ThemeContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabaseBrowser } from '@/lib/supabase/client';
+import { loginWithBeneficiaryId } from '@/lib/auth/beneficiaryAuth';
 import styles from '../auth-form.module.css';
 
 export default function LoginPage() {
   const router = useRouter();
   const { theme } = useTheme();
   const { t } = useLanguage();
-  const [email, setEmail] = useState('');
+  const [loginType, setLoginType] = useState<'email' | 'id'>('email');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -23,25 +25,32 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const { data, error } = await supabaseBrowser.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        if (error.message === 'Email not confirmed') {
-          await supabaseBrowser.auth.resend({
-            type: 'signup',
-            email,
-          });
-          router.push(`/signup/verification?email=${encodeURIComponent(email)}`);
-          return;
+      if (loginType === 'id') {
+        const data = await loginWithBeneficiaryId(identifier, password);
+        if (data.session) {
+          router.push('/main');
         }
-        throw error;
-      }
+      } else {
+        const { data, error } = await supabaseBrowser.auth.signInWithPassword({
+          email: identifier,
+          password,
+        });
 
-      if (data.session) {
-        router.push('/main');
+        if (error) {
+          if (error.message === 'Email not confirmed') {
+            await supabaseBrowser.auth.resend({
+              type: 'signup',
+              email: identifier,
+            });
+            router.push(`/signup/verification?email=${encodeURIComponent(identifier)}`);
+            return;
+          }
+          throw error;
+        }
+
+        if (data.session) {
+          router.push('/main');
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Login failed');
@@ -65,13 +74,30 @@ export default function LoginPage() {
         </button>
         <h1 className={styles.title}>{t('login')}</h1>
         
+        <div className={styles.tabs}>
+          <button
+            type="button"
+            onClick={() => setLoginType('email')}
+            className={`${styles.tab} ${loginType === 'email' ? styles.tabActive : ''}`}
+          >
+            Email
+          </button>
+          <button
+            type="button"
+            onClick={() => setLoginType('id')}
+            className={`${styles.tab} ${loginType === 'id' ? styles.tabActive : ''}`}
+          >
+            Beneficiary Code
+          </button>
+        </div>
+        
         <form onSubmit={handleLogin} className={styles.form}>
           <div className={styles.field}>
-            <label className={styles.label}>{t('email')}</label>
+            <label className={styles.label}>{loginType === 'email' ? t('email') : 'Beneficiary Code'}</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type={loginType === 'email' ? 'email' : 'text'}
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               className={styles.input}
               required
               disabled={loading}

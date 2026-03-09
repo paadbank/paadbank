@@ -65,6 +65,23 @@ export default function DashboardPage() {
           totalGiven,
           balance: totalGiven - totalSpent
         });
+      } else if (profileData?.role === 'logger') {
+        const [{ data: cycles }, { count: beneficiaryCount }] = await Promise.all([
+          supabaseBrowser.from('cycle_logs').select('*'),
+          supabaseBrowser.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'beneficiary')
+        ]);
+        const recentCycles = cycles?.filter(c => {
+          const logDate = new Date(c.created_at);
+          const weekAgo = new Date();
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          return logDate >= weekAgo;
+        }).length || 0;
+        setStats({
+          totalCycles: cycles?.length || 0,
+          recentCycles,
+          beneficiaryCount: beneficiaryCount || 0,
+          openCycles: cycles?.filter(c => c.status === 'open').length || 0
+        });
       } else if (profileData?.role === 'manager' || profileData?.role === 'admin') {
         const [{ count: beneficiaryCount }, { count: distributorCount }, { data: distributions }, { data: expenses }] = await Promise.all([
           supabaseBrowser.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'beneficiary'),
@@ -166,6 +183,31 @@ export default function DashboardPage() {
                 <div className={styles.cardIcon}>📊</div>
                 <h3>Total Expenses</h3>
                 <p className={styles.value}>{stats.totalExpenses}</p>
+              </div>
+            </>
+          )}
+
+          {profile?.role === 'logger' && (
+            <>
+              <div className={`${styles.card} ${styles[`card_${theme}`]}`}>
+                <div className={styles.cardIcon}>📝</div>
+                <h3>Total Cycles Logged</h3>
+                <p className={styles.value}>{stats.totalCycles}</p>
+              </div>
+              <div className={`${styles.card} ${styles[`card_${theme}`]}`}>
+                <div className={styles.cardIcon}>🆕</div>
+                <h3>Recent (7 days)</h3>
+                <p className={styles.value}>{stats.recentCycles}</p>
+              </div>
+              <div className={`${styles.card} ${styles[`card_${theme}`]}`}>
+                <div className={styles.cardIcon}>👥</div>
+                <h3>Beneficiaries</h3>
+                <p className={styles.value}>{stats.beneficiaryCount}</p>
+              </div>
+              <div className={`${styles.card} ${styles[`card_${theme}`]}`}>
+                <div className={styles.cardIcon}>🔓</div>
+                <h3>Open Cycles</h3>
+                <p className={styles.value}>{stats.openCycles}</p>
               </div>
             </>
           )}

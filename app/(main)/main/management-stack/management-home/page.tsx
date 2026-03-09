@@ -31,6 +31,8 @@ export default function ManagementHome() {
   };
 
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const isLogger = userRole === 'logger';
+  const isSales = userRole === 'sales';
 
   return (
     <div className={`${styles.container} ${styles[`container_${theme}`]}`}>
@@ -74,6 +76,30 @@ export default function ManagementHome() {
             <h3>{t('messages') || 'Messages'}</h3>
             <p>Communication and messaging</p>
           </div>
+
+          {isLogger && (
+            <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('log_cycle_page')}>
+              <span className={styles.icon}>📝</span>
+              <h3>Log Cycles</h3>
+              <p>Log cycles for beneficiaries</p>
+            </div>
+          )}
+
+          {isSales && (
+            <>
+              <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('transactions_page')}>
+                <span className={styles.icon}>🛒</span>
+                <h3>Transactions</h3>
+                <p>Log purchases and sales</p>
+              </div>
+
+              <div className={`${styles.card} ${styles[`card_${theme}`]}`} onClick={() => nav.push('ledger_page')}>
+                <span className={styles.icon}>📚</span>
+                <h3>Ledger</h3>
+                <p>View comprehensive ledger</p>
+              </div>
+            </>
+          )}
         </div>
       </main>
     </div>

@@ -29,7 +29,7 @@ export default function Main() {
 
   const navStackMap = new Map<string, React.ReactElement>([
     ['dashboard-stack', <DashboardStack key="dashboard-stack" />],
-    ...(userRole !== 'distributor' ? [['health-stack', <HealthStack key="health-stack" />] as [string, React.ReactElement]] : []),
+    ...(userRole !== 'distributor' && userRole !== 'logger' ? [['health-stack', <HealthStack key="health-stack" />] as [string, React.ReactElement]] : []),
     ['management-stack', <ManagementStack key="management-stack" />],
     ['notifications-stack', <NotificationsStack key="notifications-stack" />],
     ['profile-stack', <ProfileStack key="profile-stack" />],
@@ -84,7 +84,7 @@ export default function Main() {
   ];
 
   const navigationItems = allNavigationItems.filter(item => 
-    userRole === 'distributor' ? item.id !== 'health-stack' : true
+    (userRole === 'distributor' || userRole === 'logger') ? item.id !== 'health-stack' : true
   );
 
   const backgroundColor = theme === 'light' ? "#ffffff" : "#1a1a1a";

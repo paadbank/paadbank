@@ -28,7 +28,6 @@ export default function DistributionPage() {
     num_pads: '',
     transport_mode: 'pickup',
     delivery_address: '',
-    pad_cost: '',
     delivery_cost: '',
     notes: '',
   });
@@ -50,6 +49,7 @@ export default function DistributionPage() {
         .single();
 
       setUserRole(profile?.role || '');
+      console.log('User role:', profile?.role); // Debug log
 
       await demandDistributions(async ({ set }) => {
         const { data: distData } = await supabaseBrowser
@@ -81,7 +81,6 @@ export default function DistributionPage() {
     const payload = {
       ...formData,
       num_pads: parseInt(formData.num_pads),
-      pad_cost: parseFloat(formData.pad_cost) || 0,
       delivery_cost: parseFloat(formData.delivery_cost) || 0,
       distributor_id: user.id,
     };
@@ -100,7 +99,6 @@ export default function DistributionPage() {
       num_pads: '',
       transport_mode: 'pickup',
       delivery_address: '',
-      pad_cost: '',
       delivery_cost: '',
       notes: '',
     });
@@ -121,7 +119,6 @@ export default function DistributionPage() {
       num_pads: dist.num_pads.toString(),
       transport_mode: dist.transport_mode,
       delivery_address: dist.delivery_address || '',
-      pad_cost: dist.pad_cost.toString(),
       delivery_cost: dist.delivery_cost.toString(),
       notes: dist.notes || '',
     });
@@ -234,15 +231,6 @@ export default function DistributionPage() {
               </div>
             )}
             <div className={styles.field}>
-              <label>Pad Cost</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.pad_cost}
-                onChange={(e) => setFormData({ ...formData, pad_cost: e.target.value })}
-              />
-            </div>
-            <div className={styles.field}>
               <label>Delivery Cost</label>
               <input
                 type="number"
@@ -300,7 +288,7 @@ export default function DistributionPage() {
               <div className={styles.details}>
                 <p><strong>Pads:</strong> {dist.num_pads}</p>
                 <p><strong>Mode:</strong> {dist.transport_mode}</p>
-                <p><strong>Cost:</strong> ${(dist.pad_cost + dist.delivery_cost).toFixed(2)}</p>
+                <p><strong>Delivery Cost:</strong> ${dist.delivery_cost.toFixed(2)}</p>
                 {dist.notes && <p><strong>Notes:</strong> {dist.notes}</p>}
               </div>
               {dist.status === 'pending' && canCreate && (

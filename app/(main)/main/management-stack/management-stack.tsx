@@ -8,6 +8,11 @@ import ReportsPage from './reports-page/page';
 import MessagingPage from './messaging-page/page';
 import AdminPage from './admin-page/page';
 import ChatPage from './chat-page/page';
+import CreateGroupPage from './create-group-page/page';
+import GroupChatPage from './group-chat-page/page';
+import LogCyclePage from './log-cycle-page/page';
+import TransactionsPage from './transactions-page/page';
+import LedgerPage from './ledger-page/page';
 
 const managementStackNavLink = {
   management_home: ManagementHome,
@@ -17,6 +22,11 @@ const managementStackNavLink = {
   messaging_page: MessagingPage,
   admin_page: AdminPage,
   chat_page: ChatPage,
+  create_group_page: CreateGroupPage,
+  group_chat_page: GroupChatPage,
+  log_cycle_page: LogCyclePage,
+  transactions_page: TransactionsPage,
+  ledger_page: LedgerPage,
 };
 
 export const ManagementStack = () => (

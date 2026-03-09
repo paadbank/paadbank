@@ -4,17 +4,34 @@ import { useNav } from '@/lib/NavigationStack';
 import { useState, useEffect } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import { supabaseBrowser } from '@/lib/supabase/client';
+import { createUserWithId } from './actions/createUser';
+import { updateUserPassword } from './actions/updatePassword';
 import EmptyRecord from '@/components/EmptyRecord/EmptyRecord';
 import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner';
+import { useDialog } from '@/lib/DialogViewer';
 import styles from './page.module.css';
 
 export default function AdminPage() {
   const nav = useNav();
   const { theme } = useTheme();
+  const dialog = useDialog();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>('');
   const [filter, setFilter] = useState<string>('all');
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [formData, setFormData] = useState({
+    full_name: '',
+    password: '',
+    role: 'beneficiary',
+    phone: '',
+    location: '',
+  });
+  const [creating, setCreating] = useState(false);
+  const [credentials, setCredentials] = useState({ userId: '', password: '' });
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [showUpdatePassword, setShowUpdatePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
 
   useEffect(() => {
     loadData();
@@ -59,18 +76,102 @@ export default function AdminPage() {
   };
 
   const updateUserRole = async (userId: string, role: string) => {
-    if (!confirm(`Change user role to ${role}?`)) return;
-    await supabaseBrowser.from('profiles').update({ role }).eq('id', userId);
-    loadData();
+    const confirmed = window.confirm(`Change user role to ${role}?`);
+    if (confirmed) {
+      await supabaseBrowser.from('profiles').update({ role }).eq('id', userId);
+      loadData();
+    }
   };
 
   const deleteUser = async (userId: string) => {
-    if (!confirm('Delete this user? This action cannot be undone.')) return;
-    await supabaseBrowser.from('profiles').delete().eq('id', userId);
-    loadData();
+    const confirmed = window.confirm('Delete this user? This action cannot be undone.');
+    if (confirmed) {
+      await supabaseBrowser.from('profiles').delete().eq('id', userId);
+      loadData();
+    }
   };
 
-  if (loading) return <LoadingSpinner />;
+  const viewCredentials = (user: any) => {
+    setSelectedUser(user);
+    const userId = user.beneficiary_code || 'Not valid Id';
+    setCredentials({ userId, password: '' });
+    setShowUpdatePassword(false);
+    setNewPassword('');
+    
+    dialog.open(
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div>
+          <strong>Beneficiary Code:</strong>
+          <div style={{ padding: '0.5rem', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', marginTop: '0.25rem', fontFamily: 'monospace', fontSize: '1.5rem', fontWeight: 'bold', letterSpacing: '0.1em', textAlign: 'center' }}>
+            {userId}
+          </div>
+        </div>
+        {showUpdatePassword && (
+          <div>
+            <strong>New Password:</strong>
+            <input
+              type="text"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Enter new password (min 6 chars)"
+              style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem', borderRadius: '4px', border: '1px solid #ccc' }}
+            />
+          </div>
+        )}
+        {!showUpdatePassword && (
+          <button
+            onClick={() => setShowUpdatePassword(true)}
+            style={{ padding: '0.5rem 1rem', background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            Update Password
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const updatePassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      alert('Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      await updateUserPassword(selectedUser.id, newPassword);
+      setShowUpdatePassword(false);
+      setNewPassword('');
+      dialog.close();
+      alert('Password updated successfully');
+    } catch (err: any) {
+      alert(err.message || 'Failed to update password');
+    }
+  };
+
+  const createBeneficiary = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreating(true);
+    try {
+      const result = await createUserWithId({
+        full_name: formData.full_name,
+        password: formData.password,
+        role: formData.role,
+        phone: formData.phone,
+        location: formData.location,
+      });
+
+      setCredentials({ userId: result.beneficiaryCode, password: formData.password });
+      dialog.open();
+      setShowCreateForm(false);
+      setFormData({ full_name: '', password: '', role: 'beneficiary', phone: '', location: '' });
+      loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to create user');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (loading || creating) return <LoadingSpinner />;
 
   const canDelete = userRole === 'admin';
   const canManage = ['manager', 'admin'].includes(userRole);
@@ -87,10 +188,73 @@ export default function AdminPage() {
             </button>
             <h1 className={styles.title}>User Management</h1>
           </div>
+          {canManage && (
+            <button onClick={() => setShowCreateForm(!showCreateForm)} className={styles.addButton}>
+              {showCreateForm ? 'Cancel' : '+ Create User'}
+            </button>
+          )}
         </div>
       </header>
 
       <div className={styles.innerBody}>
+
+        {showCreateForm && (
+          <form onSubmit={createBeneficiary} className={`${styles.form} ${styles[`form_${theme}`]}`}>
+            <h3>Create New User</h3>
+            <div className={styles.field}>
+              <label>Full Name *</label>
+              <input
+                type="text"
+                value={formData.full_name}
+                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                required
+              />
+            </div>
+            <div className={styles.field}>
+              <label>Password *</label>
+              <input
+                type="text"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required
+                minLength={6}
+              />
+            </div>
+            <div className={styles.field}>
+              <label>Role *</label>
+              <select
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+              >
+                <option value="beneficiary">Beneficiary</option>
+                <option value="distributor">Distributor</option>
+                <option value="sales">Sales</option>
+                <option value="logger">Logger</option>
+                <option value="manager">Manager</option>
+                {userRole === 'admin' && <option value="admin">Admin</option>}
+              </select>
+            </div>
+            <div className={styles.field}>
+              <label>Phone</label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              />
+            </div>
+            <div className={styles.field}>
+              <label>Location</label>
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              />
+            </div>
+            <button type="submit" className={styles.submitButton} disabled={creating}>
+              {creating ? 'Creating...' : 'Create User'}
+            </button>
+          </form>
+        )}
 
         <div className={styles.filters}>
           <button
@@ -146,7 +310,7 @@ export default function AdminPage() {
                 <div className={styles.cardHeader}>
                   <div>
                     <h3>{user.full_name}</h3>
-                    <p className={styles.email}>{user.email}</p>
+                    <p className={styles.email}>{user.beneficiary_code ? 'Managed by user' : user.email || 'No email'}</p>
                   </div>
                   <div className={styles.badges}>
                     <span className={`${styles.badge} ${styles[user.role]}`}>{user.role}</span>
@@ -195,16 +359,28 @@ export default function AdminPage() {
                     )}
 
                     {canDelete && (
-                      <button
-                        onClick={() => deleteUser(user.id)}
-                        className={styles.deleteBtn}
-                        title="Delete User"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="3 6 5 6 21 6"/>
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        </svg>
-                      </button>
+                      <>
+                        <button
+                          onClick={() => viewCredentials(user)}
+                          className={styles.viewBtn}
+                          title="View Credentials"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => deleteUser(user.id)}
+                          className={styles.deleteBtn}
+                          title="Delete User"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                          </svg>
+                        </button>
+                      </>
                     )}
                   </div>
                 )}
@@ -213,6 +389,19 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      <dialog.DialogViewer
+        title="User Credentials"
+        buttons={[
+          ...(showUpdatePassword ? [
+            { text: 'Cancel', variant: 'secondary' as const, onClick: () => { setShowUpdatePassword(false); setNewPassword(''); } },
+            { text: 'Update', variant: 'primary' as const, onClick: updatePassword }
+          ] : [
+            { text: 'Close', variant: 'primary' as const, onClick: () => { dialog.close(); setShowUpdatePassword(false); setNewPassword(''); } }
+          ])
+        ]}
+        showCancel={false}
+      />
     </main>
   );
 }
